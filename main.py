@@ -30,7 +30,7 @@ world = b2World(gravity=(0, 0))
 def create_car():
     car_body_def = b2BodyDef()
     car_body_def.type = b2_dynamicBody
-    car_body_def.position = (96, 93)  # Set the initial position
+    car_body_def.position = (96, 93)  # Set initial position
     car = world.CreateBody(car_body_def)
     car_shape = b2PolygonShape(box=(3.0, 1.8))  # Shape in meters
     car.CreateFixture(shape=car_shape, density=1.0, friction=0.3)
