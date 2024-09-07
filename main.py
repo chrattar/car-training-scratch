@@ -133,10 +133,56 @@ def check_boundaries(car):
 
 def draw_start_finish_line():
     """Draws the start/finish line on the track."""
-    line_color = (255, 144, 44)  # Red color
+    line_color = (255, 23, 44)  # Red color
     line_start_pos = (962, 100)  # Starting position of the line in Pygame coordinates
     line_end_pos = (962, 198)  # Ending position of the line in Pygame coordinates
     pygame.draw.line(screen, line_color, line_start_pos, line_end_pos, 5)  # Line width of 5 pixels
+
+gates = [
+    {'x': 1295, 'y': 100, 'direction': 'gate1_v'},
+    {'x': 1628, 'y': 475, 'direction': 'gate2_h'},
+    {'x': 1295, 'y': 804, 'direction': 'gate_3_v'},
+    {'x': 695, 'y': 804, 'direction': 'gate_4_v'},
+    {'x': 160, 'y': 475, 'direction': 'gate5_h'},
+    {'x': 695, 'y': 100, 'direction': 'gate6_v'}]
+    # Add more gates as needed...
+
+def draw_gates():
+    """Draws the gates (checkpoints) on the track."""
+    for gate in gates:
+        gate_color = (0, 255, 0)  # Green color for gates
+        if gate['direction'] == 'gate1_v':
+            pygame.draw.line(screen, gate_color, (gate['x'], gate['y']), (gate['x'], gate['y'] + 100), 5)  # Vertical line
+        elif gate['direction'] == 'gate3_v':
+            pygame.draw.line(screen, gate_color, (gate['x'], gate['y']), (gate['x'], gate['y'] + 100), 5)  # Vertical line
+        elif gate['direction'] == 'gate4_v':
+            pygame.draw.line(screen, gate_color, (gate['x'], gate['y']), (gate['x'], gate['y'] + 100), 5)  # Vertical line
+        elif gate['direction'] == 'gate6_v':
+            pygame.draw.line(screen, gate_color, (gate['x'], gate['y']), (gate['x'], gate['y'] + 100), 5)  # Vertical line            
+        elif gate['direction'] == 'gate2_h':
+            pygame.draw.line(screen, gate_color, (gate['x'], gate['y']), (gate['x'] + 40, gate['y']), 5)  # Horizontal line
+        else:
+            gate['direction'] == 'gate5_h'
+            pygame.draw.line(screen, gate_color, (gate['x'], gate['y']), (gate['x'] + 40, gate['y']), 5)  # Horizontal line
+
+
+def check_gate_crossing(car, current_gate):   
+    x, y = car.position[0] * 10, 1080 - car.position[1] * 10 # Convert Box2D position to Pygame coordinates
+    gate_x = current_gate['x'] # Gate X pos
+    gate_y = current_gate['y'] # Gate y pos
+    direction = current_gate['direction']
+
+    if direction == 'vertical':
+        # Check if the car crossed the vertical gate
+        if abs(x - gate_x) < 5 and y > gate_y and y < gate_y + 40:  # Allow small tolerance
+            return True
+    elif direction == 'horizontal':
+        # Check if the car crossed the horizontal gate
+        if abs(y - gate_y) < 5 and x > gate_x and x < gate_x + 40:  # Allow small tolerance
+            return True
+
+    return False
+
 
 
 def run_sim(car):
@@ -159,6 +205,7 @@ def run_sim(car):
         draw_track()  
         draw_car(car)
         draw_start_finish_line()
+        draw_gates()
         pygame.display.flip()  # Refresh the screen
         clock.tick(60)
         
