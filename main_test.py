@@ -14,7 +14,7 @@ track_image_path = os.path.join(current_dir, 'track.png')  # Construct full path
 
 # Load and scale assets
 car_image = pygame.image.load(car_image_path)
-car_image = pygame.transform.scale(car_image, (10, 12))
+car_image = pygame.transform.scale(car_image, (20, 24))
 track_image = pygame.image.load(track_image_path)
 
 # World Variables
@@ -29,7 +29,7 @@ def create_car():
     car_body_def.type = b2_dynamicBody
     car_body_def.position = (96, 93)  # Set initial position
     car = world.CreateBody(car_body_def)
-    car_shape = b2PolygonShape(box=(3.0, 1.8))  # Shape in meters
+    car_shape = b2PolygonShape(box=(1.8, 3.0))  # Shape in meters
     car.CreateFixture(shape=car_shape, density=1.0, friction=0.3)
     return car
 
@@ -72,13 +72,13 @@ def controls(car, max_speed):
         forward_direction = car.GetWorldVector(localVector=(1, 1))
         forward_force = 10000 * forward_direction
         car.ApplyForceToCenter(forward_force, True)
-        print(f"Forward Force: {forward_force}")
+       # print(f"Forward Force: {forward_force}")
 
     if keys[pygame.K_DOWN]:
         backward_direction = car.GetWorldVector(localVector=(1, -1))
         backward_force = 5000 * backward_direction
         car.ApplyForceToCenter(backward_force, True)
-        print(f"Backward Force: {backward_force}")
+        #print(f"Backward Force: {backward_force}")
 
     if keys[pygame.K_LEFT]:
         car.angularVelocity = 5.0
@@ -91,7 +91,7 @@ def controls(car, max_speed):
     velocity = car.linearVelocity.length
     if velocity > max_speed:
         car.linearVelocity *= max_speed / velocity
-    print(f"Car velocity: {car.linearVelocity.length:.2f} m/s, Position: {car.position}")
+    #print(f"Car velocity: {car.linearVelocity.length:.2f} m/s, Position: {car.position}")
 
 def check_boundaries(car):
     """Keeps the car within the screen boundaries."""
@@ -130,9 +130,13 @@ def check_lap_completion(car, lap_counter):
     # Check if the car crosses the start/finish line
     if line_start_pos[0] - 5 <= x <= line_start_pos[0] + 5 and line_start_pos[1] <= y <= line_end_pos[1]:
         # Check if the car is moving in the correct direction
-        if car.linearVelocity.y > 0:  # Positive Y velocity indicates moving downward across the line
+        if car.linearVelocity.y > 0 and not lap_counter['crossing']:  # Ensure only one increment per crossing
             lap_counter['lap_count'] += 1
+            lap_counter['crossing'] = True  # Set crossing flag
             print(f"Lap completed! Total Laps: {lap_counter['lap_count']}")
+    else:
+        # Reset the crossing flag when the car is away from the line
+        lap_counter['crossing'] = False
 
 def draw_lap_count(screen, lap_counter):
     """Displays the lap count on the screen."""
@@ -142,7 +146,7 @@ def draw_lap_count(screen, lap_counter):
 
 def run_sim(car):
     # Initialize lap counter
-    lap_counter = {'lap_count': 0}
+    lap_counter = {'lap_count': 0, 'crossing': False}
     
     running = True
     clock = pygame.time.Clock()
