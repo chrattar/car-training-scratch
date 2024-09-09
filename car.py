@@ -4,6 +4,7 @@ import pygame
 from utils import line_end_pos, line_start_pos
 import numpy as np
 
+file = []
 
 
 def create_car():
