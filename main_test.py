@@ -14,7 +14,7 @@ track_image_path = os.path.join(current_dir, 'track.png')  # Construct full path
 
 # Load and scale assets
 car_image = pygame.image.load(car_image_path)
-car_image = pygame.transform.scale(car_image, (20, 24))
+car_image = pygame.transform.scale(car_image, (30, 36))
 track_image = pygame.image.load(track_image_path)
 
 # World Variables
@@ -39,7 +39,7 @@ def draw_car(car):
     x, y = position[0] * 10, 1080 - position[1] * 10  # Scale Box2D to Pygame (1 meter = 10 pixels)
 
     # Rotate the car image according to the Box2D body's angle
-    rotated_image = pygame.transform.rotate(car_image, angle * (180.0 / np.pi))
+    rotated_image = pygame.transform.rotate(car_image, (angle * (180.0 / np.pi)) )
     rect = rotated_image.get_rect(center=(x, y))
     screen.blit(rotated_image, rect.topleft)
     
@@ -49,20 +49,27 @@ def draw_track():
 def apply_friction(car):
     """Applies friction to the car to slow it down naturally."""
     velocity = car.linearVelocity
+    
+    # Calculate the car's forward direction
     forward_direction = car.GetWorldVector(localVector=(1, 0))  # Car's forward direction
     forward_speed = b2Vec2.dot(velocity, forward_direction)  # Forward component of the velocity
-    lateral_velocity = velocity - forward_direction * forward_speed  # Sideways velocity component
-
+    
+    # Calculate lateral velocity to reduce sliding
+    lateral_direction = car.GetWorldVector(localVector=(0, 1))  # Car's lateral direction
+    lateral_speed = b2Vec2.dot(velocity, lateral_direction)  # Lateral component of the velocity
+    lateral_velocity = lateral_speed * lateral_direction
+    
     # Apply lateral friction to reduce sliding
-    lateral_friction_impulse = -lateral_velocity * car.mass * 0.5
+    lateral_friction_impulse = -lateral_velocity * car.mass * 2.0  # Increase the multiplier for stronger friction
     car.ApplyLinearImpulse(lateral_friction_impulse, car.worldCenter, True)
 
-    # Apply linear friction to reduce forward/backward speed
+    # Apply linear friction to reduce forward/backward speed gradually
     forward_friction_impulse = -forward_direction * car.mass * 0.1 * forward_speed
     car.ApplyLinearImpulse(forward_friction_impulse, car.worldCenter, True)
 
-    # Angular friction (reduces angular velocity)
-    car.angularVelocity *= 0.95
+    # Apply angular friction to reduce rotational velocity gradually
+    car.angularVelocity *= 0.8  # Reduce angular velocity more aggressively to prevent spinning
+
 
 def controls(car, max_speed):
     """Applies user controls to the car."""
