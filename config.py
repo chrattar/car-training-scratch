@@ -1,6 +1,11 @@
+#config.py
 import pygame
 from Box2D import b2World
 import os
+from Box2D import b2World, b2BodyDef, b2PolygonShape, b2_dynamicBody, b2Vec2
+import pygame
+from utils import line_end_pos, line_start_pos
+import numpy as np
 
 # Screen dimensions
 SCREEN_WIDTH = 1920
