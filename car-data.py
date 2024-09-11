@@ -1,10 +1,10 @@
+#car_data.py
 from Box2D import b2World, b2BodyDef, b2PolygonShape, b2_dynamicBody, b2Vec2
 from config import world, car_image, screen
 import pygame
 from utils import line_end_pos, line_start_pos
 import numpy as np
 
-file = []
 
 
 def create_car():
@@ -66,13 +66,13 @@ def controls(car, max_speed):
     keys = pygame.key.get_pressed()
 
     if keys[pygame.K_UP]:
-        forward_direction = car.GetWorldVector(localVector=(1, 1))
+        forward_direction = car.GetWorldVector(localVector=(1, 0))
         forward_force = 10000 * forward_direction
         car.ApplyForceToCenter(forward_force, True)
        # print(f"Forward Force: {forward_force}")
 
     if keys[pygame.K_DOWN]:
-        backward_direction = car.GetWorldVector(localVector=(1, -1))
+        backward_direction = car.GetWorldVector(localVector=(-1, 0))
         backward_force = 5000 * backward_direction
         car.ApplyForceToCenter(backward_force, True)
         #print(f"Backward Force: {backward_force}")
@@ -123,7 +123,50 @@ def check_lap_completion(car, lap_counter):
         if car.linearVelocity.x > 0 and not lap_counter['crossing']:  #Lap needs to check in increasing x direction
             lap_counter['lap_count'] += 1
             lap_counter['crossing'] = True  #Cross Flag
-            print(f"Lap completed! Total Laps: {lap_counter['lap_count']}")
+            #print(f"Lap completed! Total Laps: {lap_counter['lap_count']}")
     else:
         # Reset the crossing flag when the car is away from the line
         lap_counter['crossing'] = False
+        
+def car_out_of_bounds(car):
+    """
+    Checks if the car is out of the track boundaries.
+
+    Args:
+        car: The car object representing the agent in the environment.
+
+    Returns:
+        Boolean: True if the car is out of bounds, False otherwise.
+    """
+    # Define the screen or track boundaries
+    SCREEN_WIDTH, SCREEN_HEIGHT = 1920, 1080  # Adjust to your environment's dimensions
+
+    # Get the car's current position
+    car_x, car_y = car.position.x, car.position.y
+
+    # Check if the car is within the screen boundaries
+    if car_x < 0 or car_x > SCREEN_WIDTH or car_y < 0 or car_y > SCREEN_HEIGHT:
+        return True  # The car is out of bounds
+    return False
+
+def car_collision(car):
+    """
+    Checks if the car has collided with any obstacles.
+
+    Args:
+        car: The car object representing the agent in the environment.
+
+    Returns:
+        Boolean: True if the car has collided, False otherwise.
+    """
+    # Example: Check if car has collided with the track boundaries or obstacles
+    # This requires a specific collision detection mechanism based on your environment.
+    
+    # Placeholder for collision detection logic
+    # If using Box2D, you might use car.contactList or similar to check for collisions
+    contact_list = car.contacts  # Example using Box2D contact list
+    if contact_list:
+        return True  # A collision has occurred
+
+    return False
+
