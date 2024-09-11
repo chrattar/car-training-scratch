@@ -1,3 +1,4 @@
+#utils.py
 import pygame
 
 def draw_lap_count(screen, lap_counter):
@@ -7,7 +8,6 @@ def draw_lap_count(screen, lap_counter):
 
 def initialize_lap_counter():
     return {'lap_count': 0, 'crossing': False}
-
 
 # Start/Finish line definition
 line_start_pos = (962, 100)
