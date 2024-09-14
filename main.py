@@ -4,7 +4,7 @@ from track import draw_track, draw_start_finish_line
 from utils import draw_lap_count, initialize_lap_counter
 from config import SCREEN_WIDTH, SCREEN_HEIGHT, FPS, world
 import os
-
+import numpy as np
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 
 def run_sim(car, screen):
