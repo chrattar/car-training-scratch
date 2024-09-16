@@ -6,7 +6,7 @@ from track import draw_track, draw_start_finish_line
 from config import world, screen, car_image
 from utils import initialize_lap_counter
 import pygame
-from Box2D import b2World, b2BodyDef, b2PolygonShape, b2_dynamicBody, b2Vec2 
+from Box2D import b2World, b2BodyDef, b2PolygonShape, b2_dynamicBody, b2Vec2
 
 
 class CustomCarEnv:
