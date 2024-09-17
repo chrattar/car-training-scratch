@@ -1,123 +1,158 @@
-# environment.py
-
+import math
+from Box2D import b2World, b2PolygonShape, b2BodyDef, b2_dynamicBody, b2CircleShape
+from render import draw_environment
+from config import TIME_STEP, VELOCITY_ITERATIONS, POSITION_ITERATIONS, MAX_SPEED, SCREEN_WIDTH, SCREEN_HEIGHT
 import numpy as np
-from car_data import create_car, check_lap_completion, car_collision, car_out_of_bounds, check_boundaries, draw_car, apply_friction
-from track import draw_track, draw_start_finish_line
-from config import world, screen, car_image
-from utils import initialize_lap_counter
-import pygame
-from Box2D import b2World, b2BodyDef, b2PolygonShape, b2_dynamicBody, b2Vec2
 
-
-class CustomCarEnv:
+class Environment:
     def __init__(self):
-        """
-        Initializes the custom car environment.
-        """
-        self.car = None
-        self.lap_counter = None
-        self.prev_distance_to_goal = None  # Store the previous distance to compute progress
-        self.reset()
+        self.world = b2World(gravity=(0, 0), doSleep=True)  # Initialize Box2D world
+
+        # Create collision boundaries (edges of the circular track)
+        self.track_boundaries = self.create_track_boundaries()
+
+        # Create the car
+        self.car = self.create_car()
+
+    def create_track_boundaries(self):
+        # Center and radius for the track
+        center_x, center_y = SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2
+        radius_outer = 400 / 10  # Convert to meters (Box2D units)
+        radius_inner = 170 / 10  # Inner radius for the track
+
+        track_bodies = []
+
+        # Create outer boundary as an octagon approximation of the circle
+        outer_vertices = [
+            (radius_outer * math.cos(angle) + center_x / 10, radius_outer * math.sin(angle) + center_y / 10)
+            for angle in np.linspace(0, 2 * math.pi, 8, endpoint=False)
+        ]
+
+        outer_body = self.world.CreateStaticBody(
+            position=(0, 0),
+            shapes=b2PolygonShape(vertices=outer_vertices)
+        )
+        track_bodies.append(outer_body)
+
+        # Create inner boundary as an octagon approximation of the inner circle
+        inner_vertices = [
+            (radius_inner * math.cos(angle) + center_x / 10, radius_inner * math.sin(angle) + center_y / 10)
+            for angle in np.linspace(0, 2 * math.pi, 8, endpoint=False)
+        ]
+
+        inner_body = self.world.CreateStaticBody(
+            position=(0, 0),
+            shapes=b2PolygonShape(vertices=inner_vertices)
+        )
+        track_bodies.append(inner_body)
+
+        return track_bodies
+  
+    def create_car(self):
+        # Center of the track in pixels
+        center_x = SCREEN_WIDTH / 2  # 960 pixels
+        center_y = SCREEN_HEIGHT / 2  # 540 pixels
+
+        # Desired initial position: inside the bottom of the circular track
+        initial_x = center_x / 10  # Convert x position to meters
+        initial_y = (center_y + 350) / 10  # Adjust y position to be 50 pixels inside the outer radius (400 px)
+
+        # Create the car at the specified position
+        car_body_def = b2BodyDef(type=b2_dynamicBody, position=(initial_x, initial_y), allowSleep=True)
+        car = self.world.CreateBody(car_body_def)
+        car_shape = b2PolygonShape(box=(3.0, 1.5))  # Car size in meters
+        car.CreateFixture(shape=car_shape, density=1.0, friction=0.3)
+        return car
 
     def reset(self):
-        """Resets the environment to an initial state and returns the initial observation.
+        # Center of the track in pixels
+        center_x = SCREEN_WIDTH / 2  # 960 pixels
+        center_y = SCREEN_HEIGHT / 2  # 540 pixels
 
-        Returns:
-            initial_state: The initial state of the environment."""
-        # Reset the car to its initial position
-        self.car = create_car()  # Set up the car object in its initial state
-        # Reset environment variables such as laps, position, speed, etc.
-        self.lap_counter = initialize_lap_counter()  # Reset lap counter to zero
-        self.prev_distance_to_goal = self.compute_distance_to_goal()  # Initialize the distance to the goal
-        
-        # Clear screen or set up initial screen state
-        screen.fill((0, 0, 0))  # Clear the screen with a black background
-        draw_track(screen)  # Redraw the track
-        draw_car(self.car, screen)
-        draw_start_finish_line(screen)  # Redraw the start/finish line
-        
-        # Return the initial state, which might be car's position, velocity, etc.
-        initial_state = [self.car.position.x, self.car.position.y, 0, 0]  # Example state (x, y, velocity, lap_count)
-        return initial_state
+        # Reset car's position to just inside the bottom edge of the circular track
+        initial_x = center_x / 10  # Convert x position to meters
+        initial_y = (center_y + 350) / 10  # Adjust y position to be 50 pixels inside the outer radius (400 px)
 
-    def compute_distance_to_goal(self):
-        """Computes the distance from the car to the goal (finish line or next checkpoint)."""
-        # Assume the goal is the origin (0, 0) for simplicity; adjust as needed for your environment
-        goal_position = np.array([0, 0])
-        car_position = np.array([self.car.position.x, self.car.position.y])
-        distance = np.linalg.norm(car_position - goal_position)
-        return distance
+        self.car.position = (initial_x, initial_y)  # Set to the initial position
+        self.car.linearVelocity = (0, 0)
+        self.car.angularVelocity = 0
+        return self.get_state()  # Return initial state representation
+
+
 
     def step(self, action):
-        """Perform one step in the environment based on the chosen action.
-        Args:
-            action: The action selected by the agent (e.g., 0: forward, 1: left, 2: right).
+        self.apply_action(action)  # Apply the action to the car
+        self.world.Step(TIME_STEP, VELOCITY_ITERATIONS, POSITION_ITERATIONS)  # Advance simulation
 
-        Returns:
-            next_state: The next state after performing the action.
-            reward: The reward obtained from the action.
-            done: Boolean indicating if the episode is complete.
-            info: Additional information (optional, can be used for debugging)."""
-        # Define actions
-        FORWARD, LEFT, RIGHT = 0, 1, 2
+        reward, done = self.calculate_reward_and_done()  # Compute reward and check if the episode is done
+        next_state = self.get_state()  # Get the next state
+        return next_state, reward, done
 
-        # Apply action using Box2D methods directly
-        if action == FORWARD:
-            self.car.ApplyForceToCenter((8000.0, 0.0), True)  # Apply a stronger force to move the car forward
-        elif action == LEFT:
-            self.car.ApplyTorque(50.0, True)  # Apply a torque to turn left
-        elif action == RIGHT:
-            self.car.ApplyTorque(-50.0, True)  # Apply a torque to turn right
-
-        # Apply friction to control unwanted sliding and jiggling
-        apply_friction(self.car)
-
-        # Step the simulation forward
-        world.Step(1.0 / 60.0, 8, 3)  # Update physics with Box2D (increase velocity/position iterations)
-
-        # Calculate reward
+    def apply_action(self, action):
+        if action == 0:  # Accelerate forward
+            forward_force = self.car.GetWorldVector((1, 0)) * 1000
+            self.car.ApplyForceToCenter(forward_force, True)
+        elif action == 1:  # Decelerate / brake
+            backward_force = self.car.GetWorldVector((-1, 0)) * 500
+            self.car.ApplyForceToCenter(backward_force, True)
+        elif action == 2:  # Turn left
+            self.car.ApplyTorque(50.0, True)
+        elif action == 3:  # Turn right
+            self.car.ApplyTorque(-50.0, True)
+    def calculate_reward_and_done(self):
+        # Initialize reward
         reward = 0
-        done = False
-        
-        # Reward for moving forward
-        if action == FORWARD:
-            reward += 2  # Small positive reward for each forward step
-            done = False
 
-        # Penalize for going off-track
-        if not check_boundaries(self.car):
-            reward -= 100  # Large negative reward for going off-track
-            #done = True  # Only end the episode if the car is significantly off-track
-            done = False
+        # Car's position in pixels
+        car_x, car_y = self.car.position[0] * 10, SCREEN_HEIGHT - self.car.position[1] * 10
 
-        # Reward for completing a lap
-        if check_lap_completion(self.car, self.lap_counter):
-            reward += 500  # Large reward for completing a lap
-            #done = True
-            done = False
+        # Track center and radii
+        center_x, center_y = SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2
+        outer_radius = 400
+        inner_radius = 170
 
-        # Distance-based reward for moving toward the goal
-        distance_to_goal = self.compute_distance_to_goal()
-        if distance_to_goal < self.prev_distance_to_goal:
-            reward += 1  # Reward for reducing distance to goal
-        self.prev_distance_to_goal = distance_to_goal
+        # Calculate distance from the car to the center of the track
+        distance_to_center = ((car_x - center_x) ** 2 + (car_y - center_y) ** 2) ** 0.5
 
-        # Penalize for staying still or moving too slowly
-        if np.linalg.norm((self.car.linearVelocity.x, self.car.linearVelocity.y)) < 0.1:
-            reward -= 5  # Moderate negative reward for low speed
-            done = False
+        # Check if the car is within the track boundaries
+        if inner_radius <= distance_to_center <= outer_radius:
+            # Positive reward for staying on the track
+            reward += 1
 
-        # Compute the next state
-        next_state = [self.car.position.x, self.car.position.y, self.car.linearVelocity.x, self.car.linearVelocity.y]
+            # Calculate forward velocity along the desired direction (tangential to the circular track)
+            car_velocity = self.car.linearVelocity
+            car_direction = math.atan2(car_y - center_y, car_x - center_x)  # Angle from center to car
+            desired_direction = car_direction + math.pi / 2  # Tangential direction
 
-        # Check if the car is truly out of bounds
-        if car_out_of_bounds(self.car):
-            reward -= 50  # Penalty for being out of bounds
-            done = False  # Allow some buffer before ending the episode
+            # Dot product to find alignment with the tangential direction
+            tangential_velocity = car_velocity[0] * math.cos(desired_direction) + car_velocity[1] * math.sin(desired_direction)
 
-        # Check if the car has collided
-        if car_collision(self.car):
-           done = False  # End episode if the car crashes
+            # Reward based on forward movement along the circular path
+            if tangential_velocity > 0:
+                reward += tangential_velocity * 0.1  # Scale reward by velocity along the desired direction
+            else:
+                reward -= abs(tangential_velocity) * 0.1  # Penalize backward movement
 
-        # Return the next state, reward, done flag, and additional info
-        return np.array(next_state), reward, done, {}
+            done = False  # The car is still within the track boundaries
+
+        else:
+            # Negative reward for leaving the track
+            reward -= 100
+            done = True  # The car has left the track, episode is done
+
+        return reward, done
+
+
+    def get_state(self):
+        # Get the car's position, velocity, and angle
+        car_position = self.car.position
+        car_velocity = self.car.linearVelocity
+        car_angle = self.car.angle
+
+        # Create a state vector
+        state = [
+            float(car_position[0]), float(car_position[1]),  # X, Y position
+            float(car_velocity[0]), float(car_velocity[1]),  # X, Y velocity
+            float(car_angle)  # Orientation
+        ]
+        return state
