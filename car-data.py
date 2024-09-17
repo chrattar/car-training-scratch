@@ -1,172 +1,83 @@
-#car_data.py
-from Box2D import b2World, b2BodyDef, b2PolygonShape, b2_dynamicBody, b2Vec2
-from config import world, car_image, screen
-import pygame
-from utils import line_end_pos, line_start_pos
 import numpy as np
+import random
+import torch
+import torch.nn as nn
+import torch.optim as optim
 
+class QNetwork(nn.Module):
+    def __init__(self, state_space_size, action_space_size):
+        super(QNetwork, self).__init__()
+        self.fc1 = nn.Linear(state_space_size, 64)  # Input to hidden layer
+        self.fc2 = nn.Linear(64, 64)  # Hidden to hidden layer
+        self.fc3 = nn.Linear(64, action_space_size)  # Hidden to output layer
 
+    def forward(self, x):
+        x = torch.relu(self.fc1(x))
+        x = torch.relu(self.fc2(x))
+        return self.fc3(x)
 
-def create_car():
-    car_body_def = b2BodyDef()
-    car_body_def.type = b2_dynamicBody
-    car_body_def.position = (96, 93)  # Set initial position
-    car_body_def.allowSleep = True
-    car = world.CreateBody(car_body_def)
-    car_shape = b2PolygonShape(box=(3.0, 3.0))  # Shape in meters
-    car.CreateFixture(shape=car_shape, density=1.0, friction=0.3)
-    return car
+class Agent:
+    def __init__(self, action_space_size, state_space_size, learning_rate, discount_factor, epsilon_start, epsilon_min, epsilon_decay):
+        self.action_space_size = action_space_size
+        self.state_space_size = state_space_size
+        self.learning_rate = learning_rate
+        self.discount_factor = discount_factor
+        self.epsilon = epsilon_start
+        self.epsilon_min = epsilon_min
+        self.epsilon_decay = epsilon_decay
 
-def draw_car(car, screen):
-    position = car.position
-    angle = car.angle
-    x, y = position[0] * 10, 1080 - position[1] * 10  # Scale Box2D to Pygame (1 meter = 10 pixels)
+        # Initialize the Q-network
+        self.q_network = QNetwork(state_space_size, action_space_size)
+        self.optimizer = optim.Adam(self.q_network.parameters(), lr=learning_rate)
+        self.criterion = nn.MSELoss()  # Loss function
 
-    # Rotate the car image according to the Box2D body's angle
-    rotated_image = pygame.transform.rotate(car_image, (angle * (180.0 / np.pi)) )
-    rect = rotated_image.get_rect(center=(x, y))
-    screen.blit(rotated_image, rect.topleft)
-    
-def apply_friction(car):
-    velocity = car.linearVelocity
-    angular_velocity = car.angularVelocity
-    
-    # Thresholds to prevent jiggling
-    velocity_threshold = 0.1  # Threshold for linear velocity
-    angular_velocity_threshold = 0.1  # Threshold for angular velocity
+    def select_action(self, state):
+        # Epsilon-greedy policy
+        if random.uniform(0, 1) < self.epsilon:
+            return random.randint(0, self.action_space_size - 1)  # Random action (explore)
+        else:
+            with torch.no_grad():
+                state_tensor = torch.FloatTensor(state).unsqueeze(0)  # Convert state to tensor
+                q_values = self.q_network(state_tensor)
+                return q_values.argmax().item()  # Best action (exploit)
 
-    # Calculate the car's forward direction
-    forward_direction = car.GetWorldVector(localVector=(1, 0))  # Car's forward direction
-    forward_speed = b2Vec2.dot(velocity, forward_direction)  # Forward component of the velocity
+    def learn(self, state, action, reward, next_state, done):
+        # Convert states to tensors
+        state_tensor = torch.FloatTensor(state).unsqueeze(0)  # Shape: (1, state_space_size)
+        next_state_tensor = torch.FloatTensor(next_state).unsqueeze(0)
 
-    # Calculate lateral velocity to reduce sliding
-    lateral_direction = car.GetWorldVector(localVector=(0, 1))  # Car's lateral direction
-    lateral_speed = b2Vec2.dot(velocity, lateral_direction)  # Lateral component of the velocity
-    lateral_velocity = lateral_speed * lateral_direction
+        # Compute Q-values for the current state
+        q_values = self.q_network(state_tensor)
+        q_value = q_values[0, action]
 
-    # Apply lateral friction to reduce sliding
-    lateral_friction_impulse = -lateral_velocity * car.mass * 2.0
-    car.ApplyLinearImpulse(lateral_friction_impulse, car.worldCenter, True)
+        # Compute target Q-value
+        with torch.no_grad():
+            next_q_values = self.q_network(next_state_tensor)
+            max_next_q_value = next_q_values.max(1)[0]
+            target_q_value = reward + (self.discount_factor * max_next_q_value * (1 - done))
 
-    # Apply linear friction to reduce forward/backward speed gradually
-    forward_friction_impulse = -forward_direction * car.mass * 0.1 * forward_speed
-    car.ApplyLinearImpulse(forward_friction_impulse, car.worldCenter, True)
+        # Ensure both q_value and target_q_value are the same size
+        target_q_value = torch.tensor([target_q_value])  # Convert to tensor with shape (1,)
 
-    # Apply angular friction to reduce rotational velocity gradually
-    car.angularVelocity *= 0.8
+        # Compute loss
+        loss = self.criterion(q_value, target_q_value)
 
-    # Check if the velocities are below the threshold; if so, set them to zero
-    if velocity.length < velocity_threshold:
-        car.linearVelocity.SetZero()
+        # Optimize the model
+        self.optimizer.zero_grad()
+        loss.backward()
+        self.optimizer.step()
 
-    if abs(angular_velocity) < angular_velocity_threshold:
-        car.angularVelocity = 0
+        # Decay epsilon
+        if self.epsilon > self.epsilon_min:
+            self.epsilon *= self.epsilon_decay
 
-def controls(car, max_speed):
-    keys = pygame.key.get_pressed()
+    def save_model(self, file_path):
+        """Save the model to a file."""
+        torch.save(self.q_network.state_dict(), file_path)
+        print(f"Model saved to {file_path}")
 
-    if keys[pygame.K_UP]:
-        forward_direction = car.GetWorldVector(localVector=(1, 0))
-        forward_force = 10000 * forward_direction
-        car.ApplyForceToCenter(forward_force, True)
-       # print(f"Forward Force: {forward_force}")
-
-    if keys[pygame.K_DOWN]:
-        backward_direction = car.GetWorldVector(localVector=(-1, 0))
-        backward_force = 5000 * backward_direction
-        car.ApplyForceToCenter(backward_force, True)
-        #print(f"Backward Force: {backward_force}")
-
-    if keys[pygame.K_LEFT]:
-        car.angularVelocity = 5.0
-    elif keys[pygame.K_RIGHT]:
-        car.angularVelocity = -5.0
-    else:
-        car.angularVelocity = 0
-
-    # Cap speed at max_speed
-    velocity = car.linearVelocity.length
-    if velocity > max_speed:
-        car.linearVelocity *= max_speed / velocity
-    #print(f"Car velocity: {car.linearVelocity.length:.2f} m/s, Position: {car.position}")
-
-def check_boundaries(car):
-    x, y = car.position[0] * 10, 1080 - car.position[1] * 10
-
-    min_x, max_x = 0, 1920
-    min_y, max_y = 0, 1080
-
-    if x < min_x:
-        car.linearVelocity.x = 0
-        car.angularVelocity = 0
-        car.position.x = min_x / 10
-    elif x > max_x:
-        car.linearVelocity.x = 0
-        car.angularVelocity = 0
-        car.position.x = max_x / 10
-
-    if y < min_y:
-        car.linearVelocity.y = 0
-        car.angularVelocity = 0
-        car.position.y = (1080 - min_y) / 10
-    elif y > max_y:
-        car.linearVelocity.y = 0
-        car.angularVelocity = 0
-        car.position.y = (1080 - max_y) / 10
-
-def check_lap_completion(car, lap_counter):
-    x, y = car.position[0] * 10, 1080 - car.position[1] * 10
-
-    # Check if the car crosses the start/finish line
-    if line_start_pos[0] - 5 <= x <= line_start_pos[0] + 5 and line_start_pos[1] <= y <= line_end_pos[1]:
-        # Check if the car is moving in the correct direction
-        if car.linearVelocity.x > 0 and not lap_counter['crossing']:  #Lap needs to check in increasing x direction
-            lap_counter['lap_count'] += 1
-            lap_counter['crossing'] = True  #Cross Flag
-            #print(f"Lap completed! Total Laps: {lap_counter['lap_count']}")
-    else:
-        # Reset the crossing flag when the car is away from the line
-        lap_counter['crossing'] = False
-        
-def car_out_of_bounds(car):
-    """
-    Checks if the car is out of the track boundaries.
-
-    Args:
-        car: The car object representing the agent in the environment.
-
-    Returns:
-        Boolean: True if the car is out of bounds, False otherwise.
-    """
-    # Define the screen or track boundaries
-    SCREEN_WIDTH, SCREEN_HEIGHT = 1920, 1080  # Adjust to your environment's dimensions
-
-    # Get the car's current position
-    car_x, car_y = car.position.x, car.position.y
-
-    # Check if the car is within the screen boundaries
-    if car_x < 0 or car_x > SCREEN_WIDTH or car_y < 0 or car_y > SCREEN_HEIGHT:
-        return True  # The car is out of bounds
-    return False
-
-def car_collision(car):
-    """
-    Checks if the car has collided with any obstacles.
-
-    Args:
-        car: The car object representing the agent in the environment.
-
-    Returns:
-        Boolean: True if the car has collided, False otherwise.
-    """
-    # Example: Check if car has collided with the track boundaries or obstacles
-    # This requires a specific collision detection mechanism based on your environment.
-    
-    # Placeholder for collision detection logic
-    # If using Box2D, you might use car.contactList or similar to check for collisions
-    contact_list = car.contacts  # Example using Box2D contact list
-    if contact_list:
-        return True  # A collision has occurred
-
-    return False
-
+    def load_model(self, file_path):
+        """Load the model from a file."""
+        self.q_network.load_state_dict(torch.load(file_path))
+        self.q_network.eval()  # Set the model to evaluation mode
+        print(f"Model loaded from {file_path}")
