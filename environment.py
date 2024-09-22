@@ -1,158 +1,85 @@
-import math
-from Box2D import b2World, b2PolygonShape, b2BodyDef, b2_dynamicBody, b2CircleShape
-from render import draw_environment
-from config import TIME_STEP, VELOCITY_ITERATIONS, POSITION_ITERATIONS, MAX_SPEED, SCREEN_WIDTH, SCREEN_HEIGHT
+#environment.py
+
+import pygame
 import numpy as np
 
-class Environment:
+# Colors
+WHITE = (255, 255, 255)
+BLACK = (0, 0, 0)
+GREEN = (0, 255, 0)
+
+# Track dimensions
+outer_radius = 350
+inner_radius = 250
+screen_width, screen_height = 800, 800
+center = (screen_width // 2, screen_height // 2)
+
+# Car parameters
+car_size = (20, 10)  # width, height
+
+class Car:
     def __init__(self):
-        self.world = b2World(gravity=(0, 0), doSleep=True)  # Initialize Box2D world
-
-        # Create collision boundaries (edges of the circular track)
-        self.track_boundaries = self.create_track_boundaries()
-
-        # Create the car
-        self.car = self.create_car()
-
-    def create_track_boundaries(self):
-        # Center and radius for the track
-        center_x, center_y = SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2
-        radius_outer = 400 / 10  # Convert to meters (Box2D units)
-        radius_inner = 170 / 10  # Inner radius for the track
-
-        track_bodies = []
-
-        # Create outer boundary as an octagon approximation of the circle
-        outer_vertices = [
-            (radius_outer * math.cos(angle) + center_x / 10, radius_outer * math.sin(angle) + center_y / 10)
-            for angle in np.linspace(0, 2 * math.pi, 8, endpoint=False)
-        ]
-
-        outer_body = self.world.CreateStaticBody(
-            position=(0, 0),
-            shapes=b2PolygonShape(vertices=outer_vertices)
-        )
-        track_bodies.append(outer_body)
-
-        # Create inner boundary as an octagon approximation of the inner circle
-        inner_vertices = [
-            (radius_inner * math.cos(angle) + center_x / 10, radius_inner * math.sin(angle) + center_y / 10)
-            for angle in np.linspace(0, 2 * math.pi, 8, endpoint=False)
-        ]
-
-        inner_body = self.world.CreateStaticBody(
-            position=(0, 0),
-            shapes=b2PolygonShape(vertices=inner_vertices)
-        )
-        track_bodies.append(inner_body)
-
-        return track_bodies
-  
-    def create_car(self):
-        # Center of the track in pixels
-        center_x = SCREEN_WIDTH / 2  # 960 pixels
-        center_y = SCREEN_HEIGHT / 2  # 540 pixels
-
-        # Desired initial position: inside the bottom of the circular track
-        initial_x = center_x / 10  # Convert x position to meters
-        initial_y = (center_y + 350) / 10  # Adjust y position to be 50 pixels inside the outer radius (400 px)
-
-        # Create the car at the specified position
-        car_body_def = b2BodyDef(type=b2_dynamicBody, position=(initial_x, initial_y), allowSleep=True)
-        car = self.world.CreateBody(car_body_def)
-        car_shape = b2PolygonShape(box=(3.0, 1.5))  # Car size in meters
-        car.CreateFixture(shape=car_shape, density=1.0, friction=0.3)
-        return car
-
+        self.x = center[0]  # Start at the center
+        self.y = center[1] + inner_radius + 20  # Position outside the inner circle
+        self.angle = 0  # Start angle
+        self.speed = 0  # Start speed
+        self.reset()
+            
     def reset(self):
-        # Center of the track in pixels
-        center_x = SCREEN_WIDTH / 2  # 960 pixels
-        center_y = SCREEN_HEIGHT / 2  # 540 pixels
+        # Reset car to initial state
+        self.x = center[0]
+        self.y = center[1] + inner_radius + 20
+        self.angle = 0  # Reset angle
+        self.speed = 0  # Reset speed
 
-        # Reset car's position to just inside the bottom edge of the circular track
-        initial_x = center_x / 10  # Convert x position to meters
-        initial_y = (center_y + 350) / 10  # Adjust y position to be 50 pixels inside the outer radius (400 px)
+    def move(self, action):
+        if action == 0:  # Accelerate
+            self.speed += 0.1
+        elif action == 1:  # Brake
+            self.speed -= 0.1
+        elif action == 2:  # Turn Left
+            self.angle += 5
+        elif action == 3:  # Turn Right
+            self.angle -= 5
 
-        self.car.position = (initial_x, initial_y)  # Set to the initial position
-        self.car.linearVelocity = (0, 0)
-        self.car.angularVelocity = 0
-        return self.get_state()  # Return initial state representation
+        # Update car position
+        self.x += self.speed * np.cos(np.radians(self.angle))
+        self.y -= self.speed * np.sin(np.radians(self.angle))
 
 
+# Function to check if car collides with track boundaries
+    def check_collision(self):
+        # Logic to check if car has collided with the track boundaries
+        distance_from_center = np.sqrt((self.x - center[0])**2 + (self.y - center[1])**2)
+        if distance_from_center > outer_radius or distance_from_center < inner_radius:
+            print(f"Collision detected. Distance from center: {distance_from_center}")
+            return True
+        return False
+    
+    def out_bounds(self):
+        if self.x >= screen_width or self.x < 0 or self.y >= screen_height or self.y < 0:
+            print(f"Out of bounds: Car has exited the screen at X: {self.x:.2f}, Y: {self.y:.2f}")
+            return True
+        return False
+    
+    def calculate_reward(car):
+    # Positive reward for forward movement
+        reward = car.speed * np.cos(np.radians(car.angle))  # Reward for moving forward
 
-    def step(self, action):
-        self.apply_action(action)  # Apply the action to the car
-        self.world.Step(TIME_STEP, VELOCITY_ITERATIONS, POSITION_ITERATIONS)  # Advance simulation
-
-        reward, done = self.calculate_reward_and_done()  # Compute reward and check if the episode is done
-        next_state = self.get_state()  # Get the next state
-        return next_state, reward, done
-
-    def apply_action(self, action):
-        if action == 0:  # Accelerate forward
-            forward_force = self.car.GetWorldVector((1, 0)) * 1000
-            self.car.ApplyForceToCenter(forward_force, True)
-        elif action == 1:  # Decelerate / brake
-            backward_force = self.car.GetWorldVector((-1, 0)) * 500
-            self.car.ApplyForceToCenter(backward_force, True)
-        elif action == 2:  # Turn left
-            self.car.ApplyTorque(50.0, True)
-        elif action == 3:  # Turn right
-            self.car.ApplyTorque(-50.0, True)
-    def calculate_reward_and_done(self):
-        # Initialize reward
-        reward = 0
-
-        # Car's position in pixels
-        car_x, car_y = self.car.position[0] * 10, SCREEN_HEIGHT - self.car.position[1] * 10
-
-        # Track center and radii
-        center_x, center_y = SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2
-        outer_radius = 400
-        inner_radius = 170
-
-        # Calculate distance from the car to the center of the track
-        distance_to_center = ((car_x - center_x) ** 2 + (car_y - center_y) ** 2) ** 0.5
-
-        # Check if the car is within the track boundaries
-        if inner_radius <= distance_to_center <= outer_radius:
-            # Positive reward for staying on the track
-            reward += 1
-
-            # Calculate forward velocity along the desired direction (tangential to the circular track)
-            car_velocity = self.car.linearVelocity
-            car_direction = math.atan2(car_y - center_y, car_x - center_x)  # Angle from center to car
-            desired_direction = car_direction + math.pi / 2  # Tangential direction
-
-            # Dot product to find alignment with the tangential direction
-            tangential_velocity = car_velocity[0] * math.cos(desired_direction) + car_velocity[1] * math.sin(desired_direction)
-
-            # Reward based on forward movement along the circular path
-            if tangential_velocity > 0:
-                reward += tangential_velocity * 0.1  # Scale reward by velocity along the desired direction
-            else:
-                reward -= abs(tangential_velocity) * 0.1  # Penalize backward movement
-
-            done = False  # The car is still within the track boundaries
-
+        # Penalize or reward based on how close the car is to the ideal distance (300 px)
+        ideal_distance = 300
+        outer_radius = 350
+        inner_radius = 250
+        center = (400, 400)
+        
+        # Calculate the distance from the center of the track
+        distance_from_center = np.sqrt((car.x - center[0])**2 + (car.y - center[1])**2)
+        
+        # Penalize for large deviations from the ideal distance
+        if 290 <= distance_from_center <= 310:
+            reward += 10  # High reward for being close to 300px
         else:
-            # Negative reward for leaving the track
-            reward -= 100
-            done = True  # The car has left the track, episode is done
+            reward -= 2  # Small penalty for deviation
 
-        return reward, done
+        return reward
 
-
-    def get_state(self):
-        # Get the car's position, velocity, and angle
-        car_position = self.car.position
-        car_velocity = self.car.linearVelocity
-        car_angle = self.car.angle
-
-        # Create a state vector
-        state = [
-            float(car_position[0]), float(car_position[1]),  # X, Y position
-            float(car_velocity[0]), float(car_velocity[1]),  # X, Y velocity
-            float(car_angle)  # Orientation
-        ]
-        return state
