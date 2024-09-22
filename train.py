@@ -1,67 +1,87 @@
+from agent import DQNAgent
+from environment import Car
+from render import draw_track, render_car
 import pygame
-from environment import Environment
-from agent import Agent
-from render import draw_car, draw_environment, update_screen, clear_screen
-from config import screen, NUM_EPISODES, should_render, LEARNING_RATE, DISCOUNT_FACTOR, EPSILON_START, EPSILON_MIN, EPSILON_DECAY
+import numpy as np
 
-def train(agent, environment):
-    for episode in range(NUM_EPISODES):
-        state = environment.reset()  # Reset environment
+pygame.init()
+screen_width, screen_height = 800, 800
+outer_radius = 350
+inner_radius = 250
+center = (screen_width // 2, screen_height // 2)
+screen = pygame.display.set_mode((screen_width, screen_height))  # Single display surface
+clock = pygame.time.Clock()
+
+# Initialize the environment and agent
+car = Car()
+state_size = 4  # x, y, angle, speed
+action_size = 4  # Actions: accelerate, brake, left, right
+agent = DQNAgent(state_size, action_size)
+
+max_steps_per_episode = 500
+
+def train():
+    for episode in range(1000):
+        car.reset()  # Reset the car's position and state for each episode
+        state = np.array([car.x, car.y, car.angle, car.speed])
         done = False
-        frame_count = 0
-
-        while not done:
+        total_reward = 0
+        step_count = 0
+        
+        while not done and step_count < max_steps_per_episode:
             # Handle Pygame events
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
-                    pygame.quit()
+                    pygame.quit()  # Ensure the window can close properly
                     return
+            
+            # Fill the screen with a background color (e.g., black)
+            screen.fill((0, 0, 0))  # Black background
 
-            action = agent.select_action(state)
-            next_state, reward, done = environment.step(action)  # Use environment's step method
+            # Draw the track first, then render the car
+            draw_track(screen)  # Draw the track
+            render_car(car, screen)  # Draw the car on the screen
 
-            agent.learn(state, action, reward, next_state, done)
+            # Update the display after drawing everything
+            pygame.display.flip()  # Refresh the screen
 
-            # Increment frame counter and render if needed
-            frame_count += 1
-            if should_render(frame_count):
-                clear_screen(screen)
-                draw_environment(environment, screen)
-                draw_car(environment.car, screen)
-                update_screen()
+            # Move the car based on the action
+            action = agent.act(state)
+            car.move(action)  # Apply action to move the car
+            next_state = np.array([car.x, car.y, car.angle, car.speed])
+            
+            # Calculate the reward
+            reward = car.calculate_reward()  # Calculate the reward based on the car's movement
+
+            # Check for collisions or out-of-bounds conditions
+            if car.check_collision() or car.out_bounds():
+                reward -= 100  # Large penalty for going out of bounds
+                done = True  # End the episode
+
+            # Store the experience and train the agent
+            agent.remember(state, action, reward, next_state, done)
+            agent.train()
 
             state = next_state
+            total_reward += reward
+            step_count += 1  # Increment step count
 
-            #print(f"Episode: {episode}, Frame: {frame_count}, State: {state}")
-            print(f"Episode: {episode} Action: {action}, Reward: {reward} State: {state}")
+            clock.tick(60)  # Control the speed of the simulation
 
-            # Ensure the loop continues
-            pygame.time.wait(10)  # Add a slight delay to avoid maxing out the CPU
+        # Print total reward for the episode
+        print(f"Episode {episode}, Total Reward: {total_reward}")
 
-if __name__ == "__main__":
-    # Initialize Pygame and the display
-    pygame.init()
-    screen = pygame.display.set_mode((1920, 1080))
-    pygame.display.set_caption("Car Simulation")
+        # Decay epsilon to reduce exploration over time
+        agent.decay_epsilon()
 
-    # Initialize environment and agent
-    environment = Environment()
-    
-    action_space_size = 4  # Actions: accelerate, decelerate, turn left, turn right
-    state_space_size = 5  # X, Y position, X, Y velocity, orientation
+        # Save the model every 100 episodes
+        if episode % 100 == 0:
+            agent.save_model(f"car_dqn_{episode}.pth")
 
-    agent = Agent(
-        action_space_size=action_space_size,
-        state_space_size=state_space_size,
-        learning_rate=LEARNING_RATE,
-        discount_factor=DISCOUNT_FACTOR,
-        epsilon_start=EPSILON_START,
-        epsilon_min=EPSILON_MIN,
-        epsilon_decay=EPSILON_DECAY
-    )
+# Start the training loop
+train()
 
-    # Start training
-    train(agent, environment)
-
-    # Ensure Pygame is cleaned up properly
-    pygame.quit()
+# Save the final model after training
+agent.save_model("car_dqn_final.pth")
+pygame.quit()
+print("Training finished.")
