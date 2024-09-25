@@ -1,6 +1,6 @@
 from agent import DQNAgent
 from environment import Car
-from render import draw_track, render_car
+from render import draw_track, render_car, draw_gates
 import pygame
 import numpy as np
 
@@ -40,6 +40,7 @@ def train():
 
             # Draw the track first, then render the car
             draw_track(screen)  # Draw the track
+            draw_gates(screen)
             render_car(car, screen)  # Draw the car on the screen
 
             # Update the display after drawing everything
@@ -55,7 +56,7 @@ def train():
 
             # Check for collisions or out-of-bounds conditions
             if car.check_collision() or car.out_bounds():
-                reward -= 100  # Large penalty for going out of bounds
+                
                 done = True  # End the episode
 
             # Store the experience and train the agent
