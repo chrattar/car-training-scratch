@@ -3,6 +3,8 @@ from environment import Car
 from render import draw_track, render_car, draw_gates
 import pygame
 import numpy as np
+import matplotlib.pyplot as plt  # Corrected import
+import csv
 
 pygame.init()
 screen_width, screen_height = 800, 800
@@ -19,9 +21,10 @@ action_size = 4  # Actions: accelerate, brake, left, right
 agent = DQNAgent(state_size, action_size)
 
 max_steps_per_episode = 500
+episode_rewards = []
 
 def train():
-    for episode in range(1000):
+    for episode in range(1):
         car.reset()  # Reset the car's position and state for each episode
         state = np.array([car.x, car.y, car.angle, car.speed])
         done = False
@@ -56,7 +59,6 @@ def train():
 
             # Check for collisions or out-of-bounds conditions
             if car.check_collision() or car.out_bounds():
-                
                 done = True  # End the episode
 
             # Store the experience and train the agent
@@ -70,6 +72,7 @@ def train():
             clock.tick(60)  # Control the speed of the simulation
 
         # Print total reward for the episode
+        episode_rewards.append(total_reward)
         print(f"Episode {episode}, Total Reward: {total_reward}")
 
         # Decay epsilon to reduce exploration over time
@@ -79,8 +82,25 @@ def train():
         if episode % 100 == 0:
             agent.save_model(f"car_dqn_{episode}.pth")
 
+def plot_rewards(episode_rewards):
+    plt.plot(episode_rewards)
+    plt.xlabel('Episode')
+    plt.ylabel('Total Rewards')
+    plt.title('Total Rewards per Episode')
+    plt.savefig('.\\pygamecar\\logdata\\car_reward_plt.png')  # Save the plot as a file
+    
+    # Save the rewards to a CSV file
+    with open('.\\pygamecar\\logdata\\episode_rewards.csv', 'w', newline='') as csvfile:
+        writer = csv.writer(csvfile)
+        writer.writerow(["Episode", "Total Reward"])
+        for i, reward in enumerate(episode_rewards):
+            writer.writerow([i, reward])
+
 # Start the training loop
 train()
+
+# Plot the rewards after training
+plot_rewards(episode_rewards)  # Ensure the episode rewards are passed to the function
 
 # Save the final model after training
 agent.save_model("car_dqn_final.pth")
