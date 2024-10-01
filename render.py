@@ -25,15 +25,27 @@ def draw_gates(screen):
             pygame.draw.line(screen, (255, 0, 0), gate['position'], (gate['position'][0] + 50, gate['position'][1]), 5)  # Horizontal line gate
 # Render function to draw the car and track
 
-def render_car(car, screen):
-    screen.fill(BLACK)  # Clear the screen
-    draw_track(screen)  # Draw the track
-    draw_gates(screen)
-    # Draw the car as a rectangle
-    car_color = (0, 255, 0)  # Green color for the car
-    car_size = (20, 10)  # Car dimensions
-    car_rect = pygame.Rect(car.x, car.y, car_size[0], car_size[1])
-    pygame.draw.rect(screen, car_color, car_rect)  # Draw the car as a rectangle
+def render_car(self, screen):
+    # Define car size
+    car_width = 20
+    car_height = 10
     
+    # Create the car's body as a surface
+    car_body = pygame.Surface((car_width, car_height), pygame.SRCALPHA)
+    
+    # Fill the car's body with a base color (e.g., green)
+    car_body.fill((0, 255, 0))
+    
+    # Draw the front of the car as a red rectangle
+    front_rect = pygame.Rect(0, 0, car_width // 2, car_height)  # Define the front half
+    pygame.draw.rect(car_body, (255, 0, 0), front_rect)  # Color the front red
+    
+    # Rotate the car around its center based on its angle
+    rotated_body = pygame.transform.rotate(car_body, -self.angle)
+    
+    # Get the new rectangle (for positioning) and blit the car to the screen
+    rotated_rect = rotated_body.get_rect(center=(self.x, self.y))
+    screen.blit(rotated_body, rotated_rect.topleft)
+
 
     pygame.display.flip()  # Update the display
