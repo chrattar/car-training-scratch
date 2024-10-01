@@ -29,7 +29,7 @@ episode_rewards = []
 
 #Dataframe Logging Info
 # Define the columns for the DataFrame
-columns = ["Episode", "Total Reward", "Epsilon", "Gamma", "Learning Rate", "X Position", "Y Position"]
+columns = ["Episode", "Total Reward", "Epsilon", "Gamma", "LR", "Xpos", "Ypos", "max_steps", "step_count"]
 
 # Initialize an empty DataFrame to store the episode data
 episode_log_df = pd.DataFrame(columns=columns)
@@ -146,7 +146,7 @@ def save_log_to_csv():
 train()
 
 # Plot the rewards after training
-plot_rewards(episode_rewards)  # Ensure the episode rewards are passed to the function
+plot_rewards(agent, episode_rewards)  # Ensure the episode rewards are passed to the function
 
 # Save the final model after training
 agent.save_model("car_dqn_final.pth")
