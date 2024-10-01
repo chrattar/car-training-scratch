@@ -10,12 +10,14 @@ class DQNetwork(nn.Module):
         super(DQNetwork, self).__init__()
         self.fc1 = nn.Linear(state_size, 64)
         self.fc2 = nn.Linear(64, 64)
-        self.fc3 = nn.Linear(64, action_size)
+        self.fc3 = nn.Linear(64, 64)
+        self.fc4 = nn.Linear(64, action_size)
 
     def forward(self, state):
         x = torch.relu(self.fc1(state))
         x = torch.relu(self.fc2(x))
-        return self.fc3(x)
+        x = torch.relu(self.fc3(x))
+        return self.fc4(x)
 
 # Define the DQN Agent
 class DQNAgent:
@@ -27,7 +29,7 @@ class DQNAgent:
         self.epsilon = 1.0  # Exploration rate
         self.epsilon_min = 0.01
         self.epsilon_decay = 0.995
-        self.learning_rate = 0.001
+        self.learning_rate = 0.1
         self.batch_size = 64
 
         self.model = DQNetwork(state_size, action_size)
