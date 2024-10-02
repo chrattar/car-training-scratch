@@ -39,18 +39,21 @@ class Car:
         self.speed = 0  # Reset speed
 
     def move(self, action):
-        if action == 0:  # Accelerate
-            self.speed += 1
+        if action == 0:  # Accelerate forward
+            self.speed += 3
         elif action == 1:  # Brake
-            self.speed -= 0.2        
+            self.speed -= 0.1
+            if self.speed < 0:
+                self.speed = 0  # Prevent reverse through braking
         elif action == 2:  # Turn Left
-            self.angle += 2
+            self.angle += 6
         elif action == 3:  # Turn Right
-            self.angle -= 2
+            self.angle -= 6
 
-        # Update car position
-        self.x += self.speed * np.cos(np.radians(self.angle))
-        self.y += self.speed * np.sin(np.radians(self.angle))
+        # Update car position based on speed and angle
+        self.x += self.speed * np.cos(np.radians(self.angle))  # Forward movement based on angle
+        self.y -= self.speed * np.sin(np.radians(self.angle))  # Adjust y direction to fit screen coordinates
+
 
 
 # Function to check if car collides with track boundaries
@@ -93,7 +96,7 @@ class Car:
         if car.speed >=-0.001:
             print(f"Speed {car.speed}")
     
-    def calculate_reward(self):
+    def calculate_reward(self, step_count):
         reward = 0
 
         # Reward for forward movement
@@ -101,8 +104,8 @@ class Car:
             reward += 2 * self.speed  # Reward for moving forward
 
         # Penalize for reversing or being slow
-        if self.speed < 0:
-            reward -= 2  # Penalize for reversing
+        if self.speed < 0.1:
+            reward -= 5  # Penalize for reversing
         elif self.speed < 0.1:
             reward -= 1  # Penalize for moving too slowly
 
@@ -112,7 +115,7 @@ class Car:
         # Reward for staying close to the ideal distance
         ideal_distance = 300
         if 290 <= distance_from_center <= 310:
-            reward += 5  # Reward for being near the ideal radius
+            reward += 20  + (step_count / 100) # Reward for being near the ideal radius
         else:
             reward -= (abs(distance_from_center - ideal_distance) / 100)  # Penalize for deviation
 
@@ -124,12 +127,15 @@ class Car:
         if self.out_bounds():
             reward -= 10  # Large penalty for going out of bounds
 
+        if step_count % 100 == 0:
+            reward += 10
+            
         # Reward for crossing gates in the correct direction
         for gate in gates:
             if self.check_gate_crossing(gate):
                 reward += 5  # Reward for crossing a gate in the correct direction
 
         # Print debug info for testing
-        print(f"Reward: {reward}, X: {self.x}, Y: {self.y}, Speed: {self.speed}, Distance: {distance_from_center}")
+        print(f"Reward: {reward}, X: {self.x:.4f}, Y: {self.y:.4f}, Speed: {self.speed:.4f}, Distance: {distance_from_center:.4f}")
 
         return reward
