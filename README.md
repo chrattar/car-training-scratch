@@ -8,7 +8,7 @@ Attmepting to use Box2D with pygame.
 
 * Alter the reward structure for going clockwise as opposed to anti-clockwise
 * Added Gates to the model for tracking
-* Added nn layer 64
+* Added nn layer 64, then bumped up to 128
 * added logging for review
 * Changed lr to LR = 0.1
 * Revised reward structure to penalize the car from not driving long enough
