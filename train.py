@@ -99,7 +99,7 @@ def train():
 
 def plot_rewards(agent, episode_rewards):
     # Save the rewards and DQN agent data to a CSV file
-    with open('.\\pygamecar\\logdata\\episode_rewards.csv', 'w', newline='') as csvfile:
+    with open('.\\pygamecar\\logdata\\episode_rewards_dfd.csv', 'w', newline='') as csvfile:
         writer = csv.writer(csvfile)
         # Write header
         writer.writerow(["Episode", "Total Reward", "Epsilon", "Gamma", "LR", "Xpos", "Ypos", "max_steps", "step_count"])
@@ -117,7 +117,7 @@ def plot_rewards(agent, episode_rewards):
     plt.xlabel('Episode')
     plt.ylabel('Total Rewards')
     plt.title('Total Rewards per Episode')
-    plt.savefig('.\\pygamecar\\logdata\\car_reward_plt.png')  # Save the plot as a file
+    plt.savefig('.\\pygamecar\\logdata\\car_reward_plt_dfd.png')  # Save the plot as a file
 
 def save_log_to_csv():
     # Specify the directory where you want to save the CSV files
