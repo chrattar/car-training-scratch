@@ -26,6 +26,7 @@ car_size = (20, 10)  # width, height
 class Car:
     def __init__(self):
         self.x = center[0]  # Start at the center
+        self.prev_x = self.x
         self.y = center[1] + inner_radius + 20  # Position outside the inner circle
         self.angle = 0  # Start angle
         self.speed = 0  # Start speed
@@ -39,6 +40,7 @@ class Car:
         self.speed = 0  # Reset speed
 
     def move(self, action):
+        self.prev = self.x
         if action == 0:  # Accelerate forward
             self.speed += 3
         elif action == 1:  # Brake
@@ -73,69 +75,49 @@ class Car:
             return True
         return False
 
-    def check_gate_crossing(car, gate):
-        # Define a list of gates (checkpoint positions) on the track
-        # Car passing the top gate from left to right
+    def check_gate_crossing(self, gate):
+        tolerance = 10  # Increased tolerance
+        
         if gate['orientation'] == 'vertical2':
-            if gate['position'][0] - 1 <= car.x <= gate['position'][0] + 1:
-                if car.x > gate['position'][0] and car.speed > 0:  # Car is moving to the right
-                    #print("Car passed top gate from left to right.")
+            if abs(self.x - gate['position'][0]) <= tolerance:
+                if self.prev_x <= gate['position'][0] and self.x > gate['position'][0]:
+                    return True
+        elif gate['orientation'] == 'vertical1':
+            if abs(self.x - gate['position'][0]) <= tolerance:
+                if self.prev_x >= gate['position'][0] and self.x < gate['position'][0]:
                     return True
         
-        # Car passing the bottom gate from right to left
-        elif gate['orientation'] == 'vertical1':
-            if gate['position'][0] - 1 <= car.x <= gate['position'][0] + 1:
-                if car.x < gate['position'][0] and car.speed < 0:  # Car is moving to the left
-                    #print("Car passed bottom gate from right to left.")
-                    #print(f"Speed {car.speed}")
-    
-                    return True
+        return False
 
-        return False  # Return False if no valid crossing
     def forward_motion(car):
         if car.speed >=-0.001:
             print(f"Speed {car.speed}")
     
-    def calculate_reward(self, step_count):
+    def calculate_reward(self):
         reward = 0
 
-        # Reward for forward movement
-        if self.speed > 0:
-            reward += 2 * self.speed  # Reward for moving forward
-
-        # Penalize for reversing or being slow
-        if self.speed < 0.1:
-            reward -= 5  # Penalize for reversing
-        elif self.speed < 0.1:
-            reward -= 1  # Penalize for moving too slowly
-
-        # Calculate the distance from the center of the track
+        # Calculate distance from center
         distance_from_center = np.sqrt((self.x - center[0])**2 + (self.y - center[1])**2)
 
-        # Reward for staying close to the ideal distance
-        ideal_distance = 300
-        if 290 <= distance_from_center <= 310:
-            reward += 20  + (step_count / 100) # Reward for being near the ideal radius
+        # Reward for staying within the track
+        if inner_radius < distance_from_center < outer_radius:
+            reward += 1
         else:
-            reward -= (abs(distance_from_center - ideal_distance) / 100)  # Penalize for deviation
+            reward -= 10  # Significant penalty for going out of bounds
 
-        # Collision check
-        if self.check_collision():
-            reward -= 10  # Large penalty for collision
+        # Reward for moving
+        if self.speed > 0:
+            reward += 0.1 * self.speed
 
-        # Out of bounds check
-        if self.out_bounds():
-            reward -= 10  # Large penalty for going out of bounds
-
-        if step_count % 100 == 0:
-            reward += 10
-            
-        # Reward for crossing gates in the correct direction
-        for gate in gates:
-            if self.check_gate_crossing(gate):
-                reward += 5  # Reward for crossing a gate in the correct direction
+        # Reward for moving in a circular path
+        ideal_angle = (np.degrees(np.arctan2(-(self.y - center[1]), self.x - center[0])) + 90) % 360
+        angle_diff = abs((self.angle - ideal_angle + 180) % 360 - 180)
+        if angle_diff < 20:  # If the car is moving tangent to the circle (with some tolerance)
+            reward += 1
+        print(f"Reward: {reward}, X: {self.x:.4f}, Y: {self.y:.4f}, Speed: {self.speed:.4f}, Distance: {distance_from_center:.4f}")
+        return reward
 
         # Print debug info for testing
-        print(f"Reward: {reward}, X: {self.x:.4f}, Y: {self.y:.4f}, Speed: {self.speed:.4f}, Distance: {distance_from_center:.4f}")
+      
 
-        return reward
+       
