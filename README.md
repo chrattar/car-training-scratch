@@ -11,4 +11,5 @@ Attmepting to use Box2D with pygame.
 * Added nn layer 64
 * added logging for review
 * Changed lr to LR = 0.1
+* Revised reward structure to penalize the car from not driving long enough
 * 
