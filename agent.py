@@ -3,15 +3,15 @@ import torch.nn as nn
 import torch.optim as optim
 import numpy as np
 import random
+from collections import deque
 
-# Define the Q-network
 class DQNetwork(nn.Module):
     def __init__(self, state_size, action_size):
         super(DQNetwork, self).__init__()
-        self.fc1 = nn.Linear(state_size, 64)
-        self.fc2 = nn.Linear(64, 64)
-        self.fc3 = nn.Linear(64, 64)
-        self.fc4 = nn.Linear(64, action_size)
+        self.fc1 = nn.Linear(state_size, 256)
+        self.fc2 = nn.Linear(256, 256)
+        self.fc3 = nn.Linear(256, 128)
+        self.fc4 = nn.Linear(128, action_size)
 
     def forward(self, state):
         x = torch.relu(self.fc1(state))
@@ -19,62 +19,80 @@ class DQNetwork(nn.Module):
         x = torch.relu(self.fc3(x))
         return self.fc4(x)
 
-# Define the DQN Agent
 class DQNAgent:
     def __init__(self, state_size, action_size):
         self.state_size = state_size
         self.action_size = action_size
-        self.memory = []
+        self.memory = deque(maxlen=100000)
         self.gamma = 0.99  # Discount rate
         self.epsilon = 1.0  # Exploration rate
-        self.epsilon_min = 0.01
-        self.epsilon_decay = 0.995
-        self.learning_rate = 0.1
-        self.batch_size = 64
-
-        self.model = DQNetwork(state_size, action_size)
+        self.epsilon_min = 0.05
+        self.epsilon_decay = 0.99999999
+        self.learning_rate = 0.0005
+        self.batch_size = 128
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")  # Add this line
+        self.model = DQNetwork(state_size, action_size).to(self.device)
+        self.target_model = DQNetwork(state_size, action_size).to(self.device)
         self.optimizer = optim.Adam(self.model.parameters(), lr=self.learning_rate)
         self.criterion = nn.MSELoss()
+
+                
+    def remember(self, state, action, reward, next_state, done):
+        self.memory.append((state, action, reward, next_state, done))
 
     def act(self, state):
         if np.random.rand() <= self.epsilon:
             return random.randrange(self.action_size)
-        state = torch.FloatTensor(state).unsqueeze(0)
-        q_values = self.model(state)
-        return np.argmax(q_values.detach().numpy())
+        state = torch.FloatTensor(state).unsqueeze(0).to(self.device)
+        self.model.to(self.device)
+        with torch.no_grad():
+            act_values = self.model(state)
+        return np.argmax(act_values.cpu().data.numpy())
 
     def train(self):
         if len(self.memory) < self.batch_size:
             return
 
-        # Sample a batch of experiences
         batch = random.sample(self.memory, self.batch_size)
-        for state, action, reward, next_state, done in batch:
-            target = reward
-            if not done:
-                target = reward + self.gamma * torch.max(self.model(torch.FloatTensor(next_state))).item()
+        
+        states = np.array([experience[0] for experience in batch])
+        actions = np.array([experience[1] for experience in batch])
+        rewards = np.array([experience[2] for experience in batch])
+        next_states = np.array([experience[3] for experience in batch])
+        dones = np.array([experience[4] for experience in batch])
 
-            q_values = self.model(torch.FloatTensor(state))
-            target_f = q_values.clone()
-            target_f[action] = target
+        states = torch.FloatTensor(states).to(self.device)
+        actions = torch.LongTensor(actions).to(self.device)
+        rewards = torch.FloatTensor(rewards).to(self.device)
+        next_states = torch.FloatTensor(next_states).to(self.device)
+        dones = torch.FloatTensor(dones).to(self.device)
+        
+        self.model.to(self.device)
+        self.target_model.to(self.device)
 
-            self.optimizer.zero_grad()
-            loss = self.criterion(q_values, target_f)
-            loss.backward()
-            self.optimizer.step()
+        current_q_values = self.model(states).gather(1, actions.unsqueeze(1)).squeeze(1)
+        next_q_values = self.target_model(next_states).max(1)[0]
+        target_q_values = rewards + (1 - dones) * self.gamma * next_q_values
 
-    def remember(self, state, action, reward, next_state, done):
-        self.memory.append((state, action, reward, next_state, done))
+        loss = self.criterion(current_q_values, target_q_values.detach())
+        
+        self.optimizer.zero_grad()
+        loss.backward()
+        self.optimizer.step()
 
+        self.epsilon = max(self.epsilon_min, self.epsilon * self.epsilon_decay)
+        
+    
     def decay_epsilon(self):
-        if self.epsilon > self.epsilon_min:
-            self.epsilon *= self.epsilon_decay
+            if self.epsilon > self.epsilon_min:
+                self.epsilon *= self.epsilon_decay
 
-    # Save the model's weights
+    def update_target_model(self):
+        self.target_model.load_state_dict(self.model.state_dict())
+
     def save_model(self, filename):
         torch.save(self.model.state_dict(), filename)
 
-    # Load the model's weights
     def load_model(self, filename):
         self.model.load_state_dict(torch.load(filename))
-        self.model.eval()  # Set the model to evaluation mode
+        self.model.eval()
