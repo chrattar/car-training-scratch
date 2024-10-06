@@ -1,30 +1,44 @@
 import pygame
-from environment import center, outer_radius, inner_radius, WHITE
+from environment import center, outer_radius, inner_radius, WHITE, gates, radius, angle
+import math
 
 # Initialize Pygame
+WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
+GREEN = (0, 255, 0)
+YELLOW = (255, 255, 0)
+screen_width, screen_height = 800, 800
+center = (screen_width // 2, screen_height // 2)
+radius = 300  # Adjust this value based on your track size
 
 def draw_track(screen):
     pygame.draw.circle(screen, WHITE, center, outer_radius, 5)  # Outer track
     pygame.draw.circle(screen, WHITE, center, inner_radius, 5)  # Inner track
 
-# Define a list of gates (checkpoint positions) on the track
-gates = [
-    {'position': (400, 650), 'orientation': 'vertical1'},  # Example gate
-    {'position': (400, 50), 'orientation': 'vertical2'},  # Example gate
-    # Add more gates as needed
-]
-
 def draw_gates(screen):
     for gate in gates:
-        if gate['orientation'] == 'vertical1':
-            pygame.draw.line(screen, (255, 0, 0), gate['position'], (gate['position'][0], gate['position'][1] + 95), 5)  # Vertical line gate
-        elif gate['orientation'] == 'vertical2':
-            pygame.draw.line(screen, (255, 0, 0), gate['position'], (gate['position'][0], gate['position'][1] + 95), 5)  # Vertical line gate 
-        elif gate['orientation'] == 'horizontal':
-            pygame.draw.line(screen, (255, 0, 0), gate['position'], (gate['position'][0] + 50, gate['position'][1]), 5)  # Horizontal line gate
-# Render function to draw the car and track
-
+        gate_color = GREEN if gate['number'] == 0 else YELLOW
+        pygame.draw.circle(screen, gate_color, gate['position'], 5)
+        
+        font = pygame.font.Font(None, 24)
+        text = font.render(str(gate['number']), True, gate_color)
+        
+        # Calculate text position outside the track
+        text_distance = 30  # Distance from the gate circle
+        
+        # If 'angle' is not in the gate dictionary, calculate it
+        if 'angle' not in gate:
+            x, y = gate['position']
+            angle = math.atan2(y - center[1], x - center[0])
+        else:
+            angle = gate['angle']
+        
+        text_x = center[0] + int((radius + text_distance) * math.cos(angle))
+        text_y = center[1] + int((radius + text_distance) * math.sin(angle))
+        
+        text_rect = text.get_rect(center=(text_x, text_y))
+        screen.blit(text, text_rect)
+        
 def render_car(self, screen):
     # Define car size
     car_width = 20
