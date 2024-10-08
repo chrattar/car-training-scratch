@@ -13,3 +13,8 @@ Attmepting to use Box2D with pygame.
 * Changed lr to LR = 0.1
 * Revised reward structure to penalize the car from not driving long enough
 * 
+
+The learning experience regarding this has been interesting. The depth of knowledge that is required in order to implement this.
+
+First I attempted to make this work with a png track and car diagram, but that was quickly scrapped.
+Next, we moved on to runnning this inside pygame, 
