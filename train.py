@@ -18,21 +18,21 @@ center = (screen_width // 2, screen_height // 2)
 screen = pygame.display.set_mode((screen_width, screen_height))
 clock = pygame.time.Clock()
 
-# Initialize the environment and agent
+# Init car and env
 car = Car()
 state_size = 4  # x, y, angle, speed
 action_size = 4  # Actions: accelerate, brake, left, right
 agent = DQNAgent(state_size, action_size)
-max_steps_per_episode = 1000  # Reduced from 2000 to 1000
+max_steps_per_episode = 4000  # Reduced from 2000 to 1000
 update_frequency = 2
 episode_rewards = []
 
-# Dataframe Logging Info
+# df Log info
 columns = ["Episode", "Total Reward", "Epsilon", "Gamma", "LR", "Xpos", "Ypos", "max_steps", "step_count"]
 episode_log_df = pd.DataFrame(columns=columns)
 
 def train():
-    num_episodes = 1000  # Increased from 500 to 1000
+    num_episodes = 2000  # Increased from 500 to 1000
 
     for episode in range(num_episodes):
         car.reset()
@@ -70,7 +70,6 @@ def train():
                 break
 
             clock.tick(60)
-        
         agent.decay_epsilon()
         
         # Log episode data
@@ -79,7 +78,7 @@ def train():
         
         print(f"Episode {episode}, Total Reward: {total_reward:.4f}, Steps: {step+1}, Epsilon: {agent.epsilon:.2f}")
 
-        # Save the model every 100 episodes
+        # Save the model 100 ep
         if episode % 100 == 0:
             agent.save_model(f"car_dqn_{episode}.pth")
 
@@ -99,7 +98,7 @@ def plot_rewards(agent, episode_rewards):
     plt.style.use('ggplot')
     plt.grid(True)
     
-    # Add rolling average
+    # Roll average
     window_size = 50
     rolling_mean = pd.Series(episode_rewards).rolling(window=window_size).mean()
     plt.plot(rolling_mean, color='red', label=f'{window_size}-episode Rolling Average')
@@ -120,13 +119,9 @@ def save_log_to_csv():
     else:
         episode_log_df.to_csv(file_path, mode='w', header=True, index=False)
 
-# Start the training loop
+# MAIN()
 train()
-
-# Plot the rewards after training
 plot_rewards(agent, episode_rewards)
-
-# Save the final model after training
 agent.save_model("car_dqn_final.pth")
 save_log_to_csv()
 pygame.quit()
