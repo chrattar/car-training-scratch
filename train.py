@@ -1,14 +1,12 @@
+# train.py
+
 from agent import DQNAgent
 from environment import Car
 from render import draw_track, render_car, draw_gates
 import pygame
 import numpy as np
-import matplotlib.pyplot as plt
-import csv
-import os
-import pandas as pd
-from datetime import datetime
-
+from loggingtasks import initialize_log_df, log_episode, plot_rewards, save_log_to_csv
+from plotter import EpisodePlotter
 # Initialize Set Up
 pygame.init()
 screen_width, screen_height = 800, 800
@@ -20,23 +18,27 @@ clock = pygame.time.Clock()
 
 # Init car and env
 car = Car()
-state_size = 4  # x, y, angle, speed
+num_rays = 10  # Number of rays for ray casting
+ray_length = 300  # Length of rays
+state_size = 4 + num_rays  # x, y, angle, speed, plus ray distances
 action_size = 4  # Actions: accelerate, brake, left, right
 agent = DQNAgent(state_size, action_size)
-max_steps_per_episode = 4000  # Reduced from 2000 to 1000
+max_steps_per_episode = 4000
 update_frequency = 2
 episode_rewards = []
-
-# df Log info
-columns = ["Episode", "Total Reward", "Epsilon", "Gamma", "LR", "Xpos", "Ypos", "max_steps", "step_count"]
-episode_log_df = pd.DataFrame(columns=columns)
+plotter = EpisodePlotter()
+# Initialize logging DataFrame
+episode_log_df = initialize_log_df()
 
 def train():
-    num_episodes = 2000  # Increased from 500 to 1000
+    num_episodes = 2000
+    agent.clear_memory()
 
     for episode in range(num_episodes):
         car.reset()
-        state = np.array([car.x, car.y, car.angle, car.speed])
+        ray_results = car.cast_rays(num_rays, ray_length)
+        state = np.array([car.x, car.y, car.angle, car.speed] + ray_results)
+        
         total_reward = 0
         
         for step in range(max_steps_per_episode):
@@ -44,6 +46,7 @@ def train():
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     pygame.quit()
+                    plotter.close()
                     return
             
             screen.fill((0, 0, 0))
@@ -54,10 +57,10 @@ def train():
 
             action = agent.act(state)
             car.move(action)
-            next_state = np.array([car.x, car.y, car.angle, car.speed])
+            ray_results = car.cast_rays(num_rays, ray_length)
+            next_state = np.array([car.x, car.y, car.angle, car.speed] + ray_results)
             reward = car.calculate_reward()
             done = car.check_collision() or car.out_bounds()
-
             agent.remember(state, action, reward, next_state, done)
             
             if step % update_frequency == 0:
@@ -68,61 +71,24 @@ def train():
 
             if done:
                 break
-
-            clock.tick(60)
+            clock.tick(120)      
         agent.decay_epsilon()
         
         # Log episode data
-        episode_log_df.loc[episode] = [episode, total_reward, agent.epsilon, agent.gamma, agent.learning_rate, car.x, car.y, max_steps_per_episode, step+1]
+        log_episode(episode_log_df, episode, total_reward, agent, car, max_steps_per_episode, step+1)
         episode_rewards.append(total_reward)
+        plotter.update(episode, total_reward)
         
-        print(f"Episode {episode}, Total Reward: {total_reward:.4f}, Steps: {step+1}, Epsilon: {agent.epsilon:.2f}")
+        print(f"Episode {episode}, Total Reward: {total_reward:.2f}, Steps: {step+1}, Epsilon: {agent.epsilon:.2f}")
 
-        # Save the model 100 ep
+        # Save the model every 1000 episodes
         if episode % 100 == 0:
             agent.save_model(f"car_dqn_{episode}.pth")
-
-def plot_rewards(agent, episode_rewards):
-    with open('.\\pygamecar\\logdata\\episode_rewards_dfd.csv', 'w', newline='') as csvfile:
-        writer = csv.writer(csvfile)
-        writer.writerow(["Episode", "Total Reward", "Epsilon", "Gamma", "LR", "Xpos", "Ypos", "max_steps", "step_count"])
-        for episode in range(len(episode_rewards)):
-            row = episode_log_df.loc[episode]
-            writer.writerow(row)
-
-    plt.figure(figsize=(12, 6))
-    plt.plot(episode_rewards)
-    plt.xlabel('Episode')
-    plt.ylabel('Total Rewards')
-    plt.title('Total Rewards per Episode')
-    plt.style.use('ggplot')
-    plt.grid(True)
-    
-    # Roll average
-    window_size = 50
-    rolling_mean = pd.Series(episode_rewards).rolling(window=window_size).mean()
-    plt.plot(rolling_mean, color='red', label=f'{window_size}-episode Rolling Average')
-    
-    plt.legend()
-    plt.tight_layout()
-    plt.savefig('.\\pygamecar\\logdata\\car_reward_plt_dfd.png')
-
-def save_log_to_csv():
-    save_dir = ".\\pygamecar\\logdata"
-    os.makedirs(save_dir, exist_ok=True)
-    current_datetime = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    episode_log_df['Datetime'] = current_datetime
-    
-    file_path = os.path.join(save_dir, 'episode_rewards_with_agent_data.csv')
-    if os.path.exists(file_path):
-        episode_log_df.to_csv(file_path, mode='a', header=False, index=False)
-    else:
-        episode_log_df.to_csv(file_path, mode='w', header=True, index=False)
-
+    plotter.close()
 # MAIN()
 train()
-plot_rewards(agent, episode_rewards)
+plot_rewards(episode_rewards, episode_log_df)
 agent.save_model("car_dqn_final.pth")
-save_log_to_csv()
+save_log_to_csv(episode_log_df)
 pygame.quit()
 print("Training finished.")
