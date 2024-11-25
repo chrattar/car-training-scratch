@@ -18,3 +18,6 @@ The learning experience regarding this has been interesting. The depth of knowle
 
 First I attempted to make this work with a png track and car diagram, but that was quickly scrapped.
 Next, we moved on to runnning this inside pygame, 
+
+
+This has been a terrible event and it isn't working the way I expected it to. I am curious if I need to run it for far longer?
