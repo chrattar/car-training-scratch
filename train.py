@@ -7,7 +7,8 @@ import pygame
 import numpy as np
 from loggingtasks import initialize_log_df, log_episode, plot_rewards, save_log_to_csv
 from plotter import EpisodePlotter
-# Initialize Set Up
+
+#CONFIG
 pygame.init()
 screen_width, screen_height = 800, 800
 outer_radius = 350
@@ -16,18 +17,18 @@ center = (screen_width // 2, screen_height // 2)
 screen = pygame.display.set_mode((screen_width, screen_height))
 clock = pygame.time.Clock()
 
-# Init car and env
+#CAR CONFIG SETTINGS
 car = Car()
-num_rays = 10  # Number of rays for ray casting
-ray_length = 300  # Length of rays
+num_rays = 10  
+ray_length = 300 
 state_size = 4 + num_rays  # x, y, angle, speed, plus ray distances
-action_size = 4  # Actions: accelerate, brake, left, right
+action_size = 4 #How many actions my car is doing 
 agent = DQNAgent(state_size, action_size)
 max_steps_per_episode = 4000
 update_frequency = 2
 episode_rewards = []
 plotter = EpisodePlotter()
-# Initialize logging DataFrame
+#Logging function call 
 episode_log_df = initialize_log_df()
 
 def train():
@@ -42,7 +43,6 @@ def train():
         total_reward = 0
         
         for step in range(max_steps_per_episode):
-            # Handle Pygame events
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     pygame.quit()
@@ -74,14 +74,14 @@ def train():
             clock.tick(120)      
         agent.decay_epsilon()
         
-        # Log episode data
+        # Log all the data from my car so that I can see what even works
         log_episode(episode_log_df, episode, total_reward, agent, car, max_steps_per_episode, step+1)
         episode_rewards.append(total_reward)
         plotter.update(episode, total_reward)
         
         print(f"Episode {episode}, Total Reward: {total_reward:.2f}, Steps: {step+1}, Epsilon: {agent.epsilon:.2f}")
 
-        # Save the model every 1000 episodes
+#Save the model after 1000 episodes, I can change this as asi need to 
         if episode % 100 == 0:
             agent.save_model(f"car_dqn_{episode}.pth")
     plotter.close()
