@@ -7,6 +7,7 @@ from collections import deque
 import torch.nn.functional as F
 
 
+#Std Agent Fuction, nothing crazy
 class DQNetwork(nn.Module):
     def __init__(self, state_size, action_size):
         super(DQNetwork, self).__init__()
@@ -26,13 +27,13 @@ class DQNAgent:
         self.state_size = state_size
         self.action_size = action_size
         self.memory = deque(maxlen=100000)
-        self.gamma = 0.99  # Discount rate
-        self.epsilon = 1.0  # Exploration rate
+        self.gamma = 0.99  # DISC
+        self.epsilon = 1.0 #EXPLORE
         self.epsilon_min = 0.05
-        self.epsilon_decay = 0.99999999
+        self.epsilon_decay = 0.99999999 #EXPLORE DECARY RATE
         self.learning_rate = 0.0005
         self.batch_size = 128
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")  # Add this line
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model = DQNetwork(state_size, action_size).to(self.device)
         self.target_model = DQNetwork(state_size, action_size).to(self.device)
         self.optimizer = optim.Adam(self.model.parameters(), lr=self.learning_rate)
