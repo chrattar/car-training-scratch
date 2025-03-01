@@ -4,7 +4,6 @@ import numpy as np
 import os
 import os
 
-# Load dir and name
 current_working_dir = os.getcwd()
 print("Current working directory:", current_working_dir)
 file_name = 'episode_rewards_dfd.csv'
