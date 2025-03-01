@@ -30,7 +30,7 @@ def render_car(car, screen):
     rotated_image = pygame.transform.rotate(car_image, -car.angle)
     rotated_rect = rotated_image.get_rect(center=(car.x, car.y))
     screen.blit(rotated_image, rotated_rect.topleft)
-    render_rays(car, screen, 5, 300)  # Adjust num_rays and ray_length as needed
+    render_rays(car, screen, 5, 300) 
 
 def render_game(screen, car):
     screen.fill((0, 0, 0))
